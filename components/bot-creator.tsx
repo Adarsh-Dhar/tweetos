@@ -37,14 +37,29 @@ interface BotConfig {
   };
 }
 
-export default function BotCreator() {
+interface BotCreatorProps {
+  initialName: string;
+  initialDescription: string;
+  onSave: (botConfig: any) => void;
+  twitterConfig: TwitterConfig;
+}
+
+interface ActionBlock {
+  id: string;
+  name: string;
+  icon: React.ReactNode;
+  description: string;
+}
+
+export default function BotCreator({ initialName, initialDescription, onSave, twitterConfig }: BotCreatorProps) {
+  // Define action blocks with colored icons
   const router = useRouter()
   const [draggedItem, setDraggedItem] = useState<string | null>(null)
   const [droppedItems, setDroppedItems] = useState<string[]>([])
-  const [twitterConfig, setTwitterConfig] = useState<TwitterConfig | null>(null)
+  // twitterConfig is now passed as a prop
   const [botConfig, setBotConfig] = useState<BotConfig>({
-    name: "",
-    description: "",
+    name: initialName || "",
+    description: initialDescription || "",
     triggers: [],
     actions: [],
     schedule: {
@@ -55,21 +70,14 @@ export default function BotCreator() {
   const [configTab, setConfigTab] = useState("basic")
   const [showConfigWarning, setShowConfigWarning] = useState(false)
 
-  // Load Twitter config from localStorage on component mount
+  // Check if Twitter config is valid
   useEffect(() => {
-    const storedConfig = localStorage.getItem("twitterConfig")
-    if (storedConfig) {
-      try {
-        setTwitterConfig(JSON.parse(storedConfig))
-        setShowConfigWarning(false)
-      } catch (e) {
-        console.error("Failed to parse Twitter config", e)
-        setShowConfigWarning(true)
-      }
+    if (twitterConfig) {
+      setShowConfigWarning(false)
     } else {
       setShowConfigWarning(true)
     }
-  }, [])
+  }, [twitterConfig])
 
   const handleDragStart = (item: string) => {
     setDraggedItem(item)
@@ -86,9 +94,24 @@ export default function BotCreator() {
           triggers: [...prev.triggers, { type: "hashtag", value: "" }]
         }))
       } else {
+        // Create appropriate config based on action type
+        let actionConfig = {};
+        
+        if (draggedItem === "post-tweet") {
+          actionConfig = { content: "", includeMedia: false };
+        } else if (draggedItem === "like-tweet") {
+          actionConfig = { criteria: "", limit: 50 };
+        } else if (draggedItem === "follow-user") {
+          actionConfig = { criteria: "tweet", value: "", limit: 30 };
+        } else if (draggedItem === "scheduled-tweet") {
+          actionConfig = { content: "", frequency: "daily", time: "09:00" };
+        } else if (draggedItem === "custom-code") {
+          actionConfig = { code: "// Write your custom Twitter bot logic here" };
+        }
+        
         setBotConfig(prev => ({
           ...prev,
-          actions: [...prev.actions, { type: draggedItem, config: {} }]
+          actions: [...prev.actions, { type: draggedItem, config: actionConfig }]
         }))
       }
     }
@@ -141,7 +164,7 @@ export default function BotCreator() {
     }))
   }
 
-  const actionBlocks = [
+  const actionBlocks: ActionBlock[] = [
     { id: "tweet-trigger", name: "Tweet Trigger", icon: <Twitter className="h-4 w-4 text-blue-500" />, description: "Monitor tweets with specific hashtags or mentions" },
     { id: "post-tweet", name: "Post Tweet", icon: <MessageSquare className="h-4 w-4 text-blue-500" />, description: "Post a new tweet" },
     { id: "like-tweet", name: "Like Tweet", icon: <Bell className="h-4 w-4 text-pink-500" />, description: "Like tweets that match criteria" },
@@ -158,46 +181,31 @@ export default function BotCreator() {
           className="text-center mb-12"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
           transition={{ duration: 0.5 }}
         >
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">
-            Create Your <span className="text-primary">Twitter Bot</span>
-          </h2>
-          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Drag and drop components to build your custom Twitter bot with automated actions.
+          <h2 className="text-3xl font-bold mb-4">Create Your Twitter Bot</h2>
+          <p className="text-muted-foreground max-w-2xl mx-auto">
+            Drag and drop actions to build your Twitter bot workflow. No coding required!
           </p>
         </motion.div>
-        
-        {showConfigWarning && (
-          <Alert className="mb-8 bg-amber-50 border-amber-200">
-            <AlertCircle className="h-4 w-4 text-amber-600" />
-            <AlertTitle>Twitter API Configuration Required</AlertTitle>
-            <AlertDescription className="flex items-center justify-between">
-              <span>You need to configure your Twitter API credentials before creating a bot.</span>
-              <Button size="sm" onClick={() => router.push('/twitter-config')}>
-                Configure Now
-              </Button>
-            </AlertDescription>
-          </Alert>
-        )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <div className="lg:col-span-3">
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Bot Settings</CardTitle>
-                  <CardDescription>Configure your bot details</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="bot-name">Bot Name</Label>
-                      <Input 
-                        id="bot-name" 
-                        placeholder="My Twitter Bot" 
-                        value={botConfig.name}
+        <div className="grid md:grid-cols-3 gap-8">
+          <div>
+            <h3 className="text-lg font-medium mb-4">Available Actions</h3>
+            <div className="space-y-3">
+              {actionBlocks.map((block) => (
+                <TooltipProvider key={block.id}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Card 
+                        className="cursor-grab active:cursor-grabbing hover:border-primary/50 transition-colors" 
+                        draggable 
+                        onDragStart={() => handleDragStart(block.id)}
+                      >
+                        <CardHeader className="py-3">
+                          <div className="flex items-center gap-2">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+                              {block.icon}
                         onChange={handleBotNameChange}
                       />
                     </div>
@@ -377,13 +385,47 @@ export default function BotCreator() {
                                         id="tweet-content" 
                                         placeholder="What would you like to tweet?" 
                                         className="resize-none" 
-                                        rows={3} 
+                                        rows={3}
+                                        value={botConfig.actions[index]?.config?.content || ""}
+                                        onChange={(e) => {
+                                          setBotConfig(prev => {
+                                            const newActions = [...prev.actions];
+                                            if (newActions[index]) {
+                                              newActions[index] = {
+                                                ...newActions[index],
+                                                config: {
+                                                  ...newActions[index].config,
+                                                  content: e.target.value
+                                                }
+                                              };
+                                            }
+                                            return { ...prev, actions: newActions };
+                                          });
+                                        }}
                                       />
                                     </div>
                                     <div className="grid gap-2">
                                       <div className="flex items-center justify-between">
                                         <Label htmlFor="include-media">Include Media</Label>
-                                        <Switch id="include-media" />
+                                        <Switch 
+                                          id="include-media" 
+                                          checked={botConfig.actions[index]?.config?.includeMedia || false}
+                                          onCheckedChange={(checked) => {
+                                            setBotConfig(prev => {
+                                              const newActions = [...prev.actions];
+                                              if (newActions[index]) {
+                                                newActions[index] = {
+                                                  ...newActions[index],
+                                                  config: {
+                                                    ...newActions[index].config,
+                                                    includeMedia: checked
+                                                  }
+                                                };
+                                              }
+                                              return { ...prev, actions: newActions };
+                                            });
+                                          }}
+                                        />
                                       </div>
                                     </div>
                                   </div>
@@ -394,11 +436,50 @@ export default function BotCreator() {
                                   <div className="space-y-4">
                                     <div className="grid gap-2">
                                       <Label htmlFor="like-criteria">Like tweets that contain</Label>
-                                      <Input id="like-criteria" placeholder="#hashtag or keyword" />
+                                      <Input 
+                                        id="like-criteria" 
+                                        placeholder="#hashtag or keyword" 
+                                        value={botConfig.actions[index]?.config?.criteria || ""}
+                                        onChange={(e) => {
+                                          setBotConfig(prev => {
+                                            const newActions = [...prev.actions];
+                                            if (newActions[index]) {
+                                              newActions[index] = {
+                                                ...newActions[index],
+                                                config: {
+                                                  ...newActions[index].config,
+                                                  criteria: e.target.value
+                                                }
+                                              };
+                                            }
+                                            return { ...prev, actions: newActions };
+                                          });
+                                        }}
+                                      />
                                     </div>
                                     <div className="grid gap-2">
                                       <Label htmlFor="like-limit">Maximum likes per day</Label>
-                                      <Input id="like-limit" type="number" placeholder="50" />
+                                      <Input 
+                                        id="like-limit" 
+                                        type="number" 
+                                        placeholder="50" 
+                                        value={botConfig.actions[index]?.config?.limit || 50}
+                                        onChange={(e) => {
+                                          setBotConfig(prev => {
+                                            const newActions = [...prev.actions];
+                                            if (newActions[index]) {
+                                              newActions[index] = {
+                                                ...newActions[index],
+                                                config: {
+                                                  ...newActions[index].config,
+                                                  limit: parseInt(e.target.value) || 50
+                                                }
+                                              };
+                                            }
+                                            return { ...prev, actions: newActions };
+                                          });
+                                        }}
+                                      />
                                     </div>
                                   </div>
                                 </CardContent>
@@ -408,7 +489,24 @@ export default function BotCreator() {
                                   <div className="space-y-4">
                                     <div className="grid gap-2">
                                       <Label htmlFor="follow-criteria">Follow users who</Label>
-                                      <Select defaultValue="tweet">
+                                      <Select 
+                                        value={botConfig.actions[index]?.config?.criteria || "tweet"}
+                                        onValueChange={(value) => {
+                                          setBotConfig(prev => {
+                                            const newActions = [...prev.actions];
+                                            if (newActions[index]) {
+                                              newActions[index] = {
+                                                ...newActions[index],
+                                                config: {
+                                                  ...newActions[index].config,
+                                                  criteria: value
+                                                }
+                                              };
+                                            }
+                                            return { ...prev, actions: newActions };
+                                          });
+                                        }}
+                                      >
                                         <SelectTrigger>
                                           <SelectValue placeholder="Select criteria" />
                                         </SelectTrigger>
@@ -421,11 +519,50 @@ export default function BotCreator() {
                                     </div>
                                     <div className="grid gap-2">
                                       <Label htmlFor="follow-value">Hashtag or keyword</Label>
-                                      <Input id="follow-value" placeholder="#TwitterBot" />
+                                      <Input 
+                                        id="follow-value" 
+                                        placeholder="#TwitterBot" 
+                                        value={botConfig.actions[index]?.config?.value || ""}
+                                        onChange={(e) => {
+                                          setBotConfig(prev => {
+                                            const newActions = [...prev.actions];
+                                            if (newActions[index]) {
+                                              newActions[index] = {
+                                                ...newActions[index],
+                                                config: {
+                                                  ...newActions[index].config,
+                                                  value: e.target.value
+                                                }
+                                              };
+                                            }
+                                            return { ...prev, actions: newActions };
+                                          });
+                                        }}
+                                      />
                                     </div>
                                     <div className="grid gap-2">
                                       <Label htmlFor="follow-limit">Maximum follows per day</Label>
-                                      <Input id="follow-limit" type="number" placeholder="30" />
+                                      <Input 
+                                        id="follow-limit" 
+                                        type="number" 
+                                        placeholder="30" 
+                                        value={botConfig.actions[index]?.config?.limit || 30}
+                                        onChange={(e) => {
+                                          setBotConfig(prev => {
+                                            const newActions = [...prev.actions];
+                                            if (newActions[index]) {
+                                              newActions[index] = {
+                                                ...newActions[index],
+                                                config: {
+                                                  ...newActions[index].config,
+                                                  limit: parseInt(e.target.value) || 30
+                                                }
+                                              };
+                                            }
+                                            return { ...prev, actions: newActions };
+                                          });
+                                        }}
+                                      />
                                     </div>
                                   </div>
                                 </CardContent>
@@ -440,12 +577,45 @@ export default function BotCreator() {
                                         placeholder="What would you like to tweet?" 
                                         className="resize-none" 
                                         rows={3} 
+                                        value={botConfig.actions[index]?.config?.content || ""}
+                                        onChange={(e) => {
+                                          setBotConfig(prev => {
+                                            const newActions = [...prev.actions];
+                                            if (newActions[index]) {
+                                              newActions[index] = {
+                                                ...newActions[index],
+                                                config: {
+                                                  ...newActions[index].config,
+                                                  content: e.target.value
+                                                }
+                                              };
+                                            }
+                                            return { ...prev, actions: newActions };
+                                          });
+                                        }}
                                       />
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                       <div className="grid gap-2">
                                         <Label htmlFor="schedule-frequency">Frequency</Label>
-                                        <Select defaultValue="daily">
+                                        <Select 
+                                          value={botConfig.actions[index]?.config?.frequency || "daily"}
+                                          onValueChange={(value) => {
+                                            setBotConfig(prev => {
+                                              const newActions = [...prev.actions];
+                                              if (newActions[index]) {
+                                                newActions[index] = {
+                                                  ...newActions[index],
+                                                  config: {
+                                                    ...newActions[index].config,
+                                                    frequency: value
+                                                  }
+                                                };
+                                              }
+                                              return { ...prev, actions: newActions };
+                                            });
+                                          }}
+                                        >
                                           <SelectTrigger>
                                             <SelectValue placeholder="Select frequency" />
                                           </SelectTrigger>
@@ -458,7 +628,26 @@ export default function BotCreator() {
                                       </div>
                                       <div className="grid gap-2">
                                         <Label htmlFor="schedule-time">Time</Label>
-                                        <Input id="schedule-time" type="time" defaultValue="09:00" />
+                                        <Input 
+                                          id="schedule-time" 
+                                          type="time" 
+                                          value={botConfig.actions[index]?.config?.time || "09:00"}
+                                          onChange={(e) => {
+                                            setBotConfig(prev => {
+                                              const newActions = [...prev.actions];
+                                              if (newActions[index]) {
+                                                newActions[index] = {
+                                                  ...newActions[index],
+                                                  config: {
+                                                    ...newActions[index].config,
+                                                    time: e.target.value
+                                                  }
+                                                };
+                                              }
+                                              return { ...prev, actions: newActions };
+                                            });
+                                          }}
+                                        />
                                       </div>
                                     </div>
                                   </div>
@@ -474,6 +663,22 @@ export default function BotCreator() {
                                         placeholder="// Write your custom Twitter bot logic here" 
                                         className="font-mono text-sm" 
                                         rows={6} 
+                                        value={botConfig.actions[index]?.config?.code || "// Write your custom Twitter bot logic here"}
+                                        onChange={(e) => {
+                                          setBotConfig(prev => {
+                                            const newActions = [...prev.actions];
+                                            if (newActions[index]) {
+                                              newActions[index] = {
+                                                ...newActions[index],
+                                                config: {
+                                                  ...newActions[index].config,
+                                                  code: e.target.value
+                                                }
+                                              };
+                                            }
+                                            return { ...prev, actions: newActions };
+                                          });
+                                        }}
                                       />
                                     </div>
                                     <Alert className="bg-amber-50 border-amber-200">
@@ -495,7 +700,22 @@ export default function BotCreator() {
                           </div>
                         )
                       })}
-                      <Button variant="outline" className="w-full gap-2">
+                      <Button 
+                        variant="outline" 
+                        className="w-full gap-2" 
+                        onClick={() => {
+                          // Show a dropdown or modal to select an action
+                          const newAction = "post-tweet"; // Default action
+                          setDroppedItems([...droppedItems, newAction]);
+                          setBotConfig(prev => ({
+                            ...prev,
+                            actions: [...prev.actions, { 
+                              type: newAction, 
+                              config: { content: "", includeMedia: false } 
+                            }]
+                          }));
+                        }}
+                      >
                         <Plus className="h-4 w-4" /> Add Action
                       </Button>
                     </div>
@@ -507,7 +727,20 @@ export default function BotCreator() {
                   <Button variant="outline">Test Bot</Button>
                   <Button variant="outline">Save as Template</Button>
                 </div>
-                <Button disabled={droppedItems.length === 0 || !twitterConfig}>Deploy Bot</Button>
+                <Button 
+                  onClick={() => {
+                    // Make sure the botConfig has the latest name and description
+                    const finalBotConfig = {
+                      ...botConfig,
+                      name: botConfig.name || initialName,
+                      description: botConfig.description || initialDescription
+                    };
+                    onSave(finalBotConfig);
+                  }}
+                  disabled={droppedItems.length === 0 || !twitterConfig}
+                >
+                  Deploy Bot
+                </Button>
               </CardFooter>
             </Card>
           </div>
