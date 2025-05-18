@@ -9,7 +9,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import HeroSection from "@/components/hero-section"
 import FeatureSection from "@/components/feature-section"
 import HowItWorks from "@/components/how-it-works"
-import BotCreator from "@/components/bot-creator"
 import PricingSection from "@/components/pricing-section"
 import Footer from "@/components/footer"
 
@@ -70,7 +69,6 @@ export default function Home() {
             </TabsContent>
 
             <TabsContent value="create">
-              <BotCreator />
             </TabsContent>
           </Tabs>
         </div>
